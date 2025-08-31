@@ -412,4 +412,5 @@ if __name__ == '__main__':
     print(f"   • GET /api/family/<id>/history - история семьи")
     print(f"   • GET /api/family/<id>/members - члены семьи")
     
+    # Для Render используем host='0.0.0.0'
     app.run(host='0.0.0.0', port=port, debug=False)

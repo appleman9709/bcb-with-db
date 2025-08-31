@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: babycarebot-api
+    env: python
+    plan: free
+    buildCommand: pip install -r api_requirements.txt
+    startCommand: python api.py
+    envVars:
+      - key: API_PORT
+        value: 10000
+      - key: PYTHON_VERSION
+        value: 3.9.16
