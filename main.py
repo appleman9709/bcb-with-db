@@ -1193,7 +1193,7 @@ async def start(event):
         [Button.text("🍼 Кормление"), Button.text("🧷 Смена подгузника")],
         [Button.text("😴 Сон"), Button.text("📜 История")],
         [Button.text("💡 Совет"), Button.text("⚙ Настройки")],
-        [Button.url("📊 Дашборд", "https://babycarebot-dashboard.vercel.app")]
+        [Button.url("📊 Дашборд", "https://bcb-db.vercel.app")]
     ]
     
     await event.respond(welcome_message, buttons=buttons)

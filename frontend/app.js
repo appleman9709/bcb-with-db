@@ -1,5 +1,5 @@
 // Конфигурация
-const API_BASE_URL = 'http://localhost:5000/api'; // Измените на ваш сервер
+const API_BASE_URL = window.APP_CONFIG.API_BASE_URL;
 let currentFamilyId = null;
 let historyChart = null;
 
