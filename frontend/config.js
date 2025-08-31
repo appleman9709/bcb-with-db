@@ -2,7 +2,7 @@
 const config = {
     // Локальная разработка
     development: {
-        API_BASE_URL: 'http://localhost:5000/api'
+        API_BASE_URL: 'https://bcb-db.vercel.app/api'
     },
     // Продакшн (Vercel)
     production: {
