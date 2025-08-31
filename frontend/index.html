@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BabyCareBot Dashboard</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Заголовок -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="app-title">👶 BabyCareBot</h1>
+                <div class="family-selector">
+                    <select id="familySelect" class="family-select">
+                        <option value="">Выберите семью...</option>
+                    </select>
+                </div>
+            </div>
+        </header>
+
+        <!-- Основной контент -->
+        <main class="main-content">
+            <!-- Загрузка -->
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Загружаем данные...</p>
+            </div>
+
+            <!-- Дашборд -->
+            <div id="dashboard" class="dashboard hidden">
+                <!-- Информация о семье -->
+                <div class="family-info">
+                    <h2 id="familyName" class="family-name">Название семьи</h2>
+                    <div class="baby-info">
+                        <span id="babyAge" class="baby-age">Возраст: 0 мес.</span>
+                        <span id="babyBirthDate" class="baby-birth-date"></span>
+                    </div>
+                </div>
+
+                <!-- Статистика за сегодня -->
+                <div class="today-stats">
+                    <h3>📊 Сегодня</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card feeding">
+                            <div class="stat-icon">🍼</div>
+                            <div class="stat-content">
+                                <div class="stat-number" id="todayFeedings">0</div>
+                                <div class="stat-label">Кормления</div>
+                            </div>
+                        </div>
+                        <div class="stat-card diaper">
+                            <div class="stat-icon">🧷</div>
+                            <div class="stat-content">
+                                <div class="stat-number" id="todayDiapers">0</div>
+                                <div class="stat-label">Подгузники</div>
+                            </div>
+                        </div>
+                        <div class="stat-card bath">
+                            <div class="stat-icon">🛁</div>
+                            <div class="stat-content">
+                                <div class="stat-number" id="todayBaths">0</div>
+                                <div class="stat-label">Купания</div>
+                            </div>
+                        </div>
+                        <div class="stat-card activity">
+                            <div class="stat-icon">🎮</div>
+                            <div class="stat-content">
+                                <div class="stat-number" id="todayActivities">0</div>
+                                <div class="stat-label">Активности</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Последние события -->
+                <div class="last-events">
+                    <h3>⏰ Последние события</h3>
+                    
+                    <!-- Кормление -->
+                    <div class="event-card feeding" id="lastFeeding">
+                        <div class="event-icon">🍼</div>
+                        <div class="event-content">
+                            <div class="event-title">Кормление</div>
+                            <div class="event-time" id="lastFeedingTime">Нет данных</div>
+                            <div class="event-author" id="lastFeedingAuthor"></div>
+                        </div>
+                        <div class="event-status" id="feedingStatus"></div>
+                    </div>
+
+                    <!-- Подгузник -->
+                    <div class="event-card diaper" id="lastDiaper">
+                        <div class="event-icon">🧷</div>
+                        <div class="event-content">
+                            <div class="event-title">Смена подгузника</div>
+                            <div class="event-time" id="lastDiaperTime">Нет данных</div>
+                            <div class="event-author" id="lastDiaperAuthor"></div>
+                        </div>
+                        <div class="event-status" id="diaperStatus"></div>
+                    </div>
+
+                    <!-- Купание -->
+                    <div class="event-card bath" id="lastBath">
+                        <div class="event-icon">🛁</div>
+                        <div class="event-content">
+                            <div class="event-title">Купание</div>
+                            <div class="event-time" id="lastBathTime">Нет данных</div>
+                            <div class="event-author" id="lastBathAuthor"></div>
+                        </div>
+                        <div class="event-status" id="bathStatus"></div>
+                    </div>
+
+                    <!-- Активность -->
+                    <div class="event-card activity" id="lastActivity">
+                        <div class="event-icon">🎮</div>
+                        <div class="event-content">
+                            <div class="event-title">Активность</div>
+                            <div class="event-time" id="lastActivityTime">Нет данных</div>
+                            <div class="event-author" id="lastActivityAuthor"></div>
+                        </div>
+                        <div class="event-status" id="activityStatus"></div>
+                    </div>
+                </div>
+
+                <!-- Сон -->
+                <div class="sleep-section">
+                    <h3>😴 Сон</h3>
+                    <div class="sleep-card" id="sleepCard">
+                        <div class="sleep-icon">🌙</div>
+                        <div class="sleep-content">
+                            <div class="sleep-status" id="sleepStatus">Малыш не спит</div>
+                            <div class="sleep-duration" id="sleepDuration"></div>
+                            <div class="sleep-author" id="sleepAuthor"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- График истории -->
+                <div class="history-section">
+                    <h3>📈 История (7 дней)</h3>
+                    <div class="chart-container">
+                        <canvas id="historyChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Члены семьи -->
+                <div class="family-members">
+                    <h3>👥 Члены семьи</h3>
+                    <div class="members-list" id="membersList">
+                        <!-- Члены семьи будут загружены динамически -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ошибка -->
+            <div id="error" class="error hidden">
+                <div class="error-icon">❌</div>
+                <h3>Ошибка загрузки</h3>
+                <p id="errorMessage">Не удалось загрузить данные</p>
+                <button class="retry-btn" onclick="loadDashboard()">Повторить</button>
+            </div>
+        </main>
+
+        <!-- Футер -->
+        <footer class="footer">
+            <p>BabyCareBot Dashboard v1.0</p>
+        </footer>
+    </div>
+
+    <!-- Chart.js для графиков -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

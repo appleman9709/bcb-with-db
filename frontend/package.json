@@ -1,0 +1,23 @@
+{
+  "name": "babycarebot-dashboard",
+  "version": "1.0.0",
+  "description": "Telegram Mini App Dashboard for BabyCareBot",
+  "main": "index.html",
+  "scripts": {
+    "dev": "echo 'Open index.html in browser'",
+    "build": "echo 'Static files ready'",
+    "start": "echo 'Static files ready'"
+  },
+  "keywords": [
+    "telegram",
+    "mini-app",
+    "dashboard",
+    "babycare",
+    "vercel"
+  ],
+  "author": "BabyCareBot Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
