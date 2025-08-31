@@ -6,7 +6,7 @@ const config = {
     },
     // Продакшн (Vercel)
     production: {
-        API_BASE_URL: 'https://bcb-db.vercel.app/api' // Измените на ваш API сервер
+        API_BASE_URL: 'https://babycarebot-api.onrender.com/api'
     }
 };
 
