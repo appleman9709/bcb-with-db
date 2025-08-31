@@ -27,7 +27,7 @@ async function initializeApp() {
         
         // Если есть семьи, загружаем первую
         const familySelect = document.getElementById('familySelect');
-        if (familySelect.value) {
+        if (familySelect.value && familySelect.value !== '') {
             await loadDashboard(familySelect.value);
         }
         
@@ -75,6 +75,12 @@ async function loadFamilies() {
 // Загрузка дашборда
 async function loadDashboard(familyId) {
     try {
+        // Проверяем, что ID семьи валидный
+        if (!familyId || familyId === 'undefined' || familyId === '') {
+            console.log('ID семьи не выбран, пропускаем загрузку дашборда');
+            return;
+        }
+        
         showLoading();
         currentFamilyId = familyId;
         
@@ -372,7 +378,7 @@ function showError(message) {
 
 // Автообновление данных каждые 30 секунд
 setInterval(() => {
-    if (currentFamilyId) {
+    if (currentFamilyId && currentFamilyId !== 'undefined' && currentFamilyId !== '') {
         loadDashboard(currentFamilyId);
     }
 }, 30000);

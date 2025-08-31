@@ -386,18 +386,25 @@ def get_family_members(family_id):
 def get_families():
     """Получить список всех семей (только ID и названия)"""
     try:
+        print(f"🔍 Запрос на получение списка семей")
         conn = get_db_connection()
         if not conn:
+            print(f"❌ Ошибка подключения к БД")
             return jsonify({"error": "Database connection failed"}), 500
         
         cur = conn.cursor()
         cur.execute("SELECT id, name FROM families ORDER BY name")
         families = [{"id": row['id'], "name": row['name']} for row in cur.fetchall()]
         
+        print(f"✅ Найдено семей: {len(families)}")
+        for family in families:
+            print(f"   • ID: {family['id']}, Название: {family['name']}")
+        
         conn.close()
         return jsonify({"families": families})
         
     except Exception as e:
+        print(f"❌ Ошибка в get_families: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
