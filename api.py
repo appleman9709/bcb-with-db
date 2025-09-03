@@ -31,9 +31,13 @@ def get_db_connection():
         # Пытаемся подключиться к локальной БД (для разработки)
         if os.path.exists("babybot.db"):
             conn = sqlite3.connect("babybot.db")
+            print("✅ Подключение к локальной БД babybot.db")
+        elif os.path.exists("babybot_render.db"):
+            conn = sqlite3.connect("babybot_render.db")
+            print("✅ Подключение к БД babybot_render.db")
         else:
             # На Render создаем тестовую БД или возвращаем None
-            print("⚠️ База данных babybot.db не найдена")
+            print("⚠️ База данных не найдена, используем тестовые данные")
             return None
             
         conn.row_factory = sqlite3.Row  # Возвращаем результаты как словари
