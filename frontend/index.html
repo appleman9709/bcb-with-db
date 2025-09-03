@@ -14,11 +14,6 @@
         <header class="header">
             <div class="header-content">
                 <h1 class="app-title">👶 BabyCareBot</h1>
-                <div class="family-selector">
-                    <select id="familySelect" class="family-select">
-                        <option value="">Выберите семью...</option>
-                    </select>
-                </div>
             </div>
         </header>
 
@@ -163,6 +158,16 @@
                 <button class="retry-btn" onclick="loadDashboard()">Повторить</button>
             </div>
         </main>
+
+        <!-- Выбор семьи -->
+        <div class="family-selector-bottom">
+            <div class="family-selector-content">
+                <label for="familySelect" class="family-select-label">Семья:</label>
+                <select id="familySelect" class="family-select">
+                    <option value="">Выберите семью...</option>
+                </select>
+            </div>
+        </div>
 
         <!-- Футер -->
         <footer class="footer">

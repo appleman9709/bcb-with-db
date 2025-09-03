@@ -22,14 +22,8 @@ async function initializeApp() {
             }
         }
         
-        // Загружаем список семей
+        // Загружаем список семей (автоматически выберет Коршиковых)
         await loadFamilies();
-        
-        // Если есть семьи, загружаем первую
-        const familySelect = document.getElementById('familySelect');
-        if (familySelect.value && familySelect.value !== '') {
-            await loadDashboard(familySelect.value);
-        }
         
     } catch (error) {
         console.error('Ошибка инициализации:', error);
@@ -58,6 +52,20 @@ async function loadFamilies() {
             option.textContent = family.name;
             familySelect.appendChild(option);
         });
+        
+        // Автоматически выбираем семью "Коршиковы" или первую доступную
+        let defaultFamilyId = null;
+        const korchikovFamily = data.families.find(family => family.name.includes('Коршиковы') || family.name.includes('Коршиков'));
+        if (korchikovFamily) {
+            defaultFamilyId = korchikovFamily.id;
+        } else if (data.families.length > 0) {
+            defaultFamilyId = data.families[0].id;
+        }
+        
+        if (defaultFamilyId) {
+            familySelect.value = defaultFamilyId;
+            await loadDashboard(defaultFamilyId);
+        }
         
         // Добавляем обработчик изменения
         familySelect.addEventListener('change', async function() {

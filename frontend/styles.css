@@ -518,6 +518,51 @@ body {
     }
 }
 
+/* Выбор семьи внизу */
+.family-selector-bottom {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 1rem 0;
+    margin-top: auto;
+}
+
+.family-selector-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.family-select-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #4a5568;
+    margin: 0;
+}
+
+.family-selector-bottom .family-select {
+    padding: 0.5rem 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    background: white;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #4a5568;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 200px;
+}
+
+.family-selector-bottom .family-select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
 @media (max-width: 480px) {
     .stats-grid {
         grid-template-columns: 1fr;
@@ -529,5 +574,14 @@ body {
     
     .chart-container {
         padding: 1rem;
+    }
+    
+    .family-selector-content {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .family-selector-bottom .family-select {
+        min-width: 100%;
     }
 }
