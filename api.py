@@ -54,6 +54,8 @@ def health_check():
 @app.route('/api/family/<int:family_id>/dashboard', methods=['GET'])
 def get_family_dashboard(family_id):
     """Получить данные дашборда для семьи"""
+    # Получаем параметр периода
+    period = request.args.get('period', 'today')
     try:
         conn = get_db_connection()
         if not conn:
@@ -108,10 +110,10 @@ def get_family_dashboard(family_id):
                     "duration": None
                 },
                 "today_stats": {
-                    "feedings": 5,
-                    "diapers": 4,
-                    "baths": 1,
-                    "activities": 3
+                    "feedings": 5 if period == 'today' else (35 if period == 'week' else 150),
+                    "diapers": 4 if period == 'today' else (28 if period == 'week' else 120),
+                    "baths": 1 if period == 'today' else (7 if period == 'week' else 30),
+                    "activities": 3 if period == 'today' else (21 if period == 'week' else 90)
                 }
             }
             return jsonify(test_data)
@@ -134,8 +136,17 @@ def get_family_dashboard(family_id):
         
         # Получаем последние события
         today = get_thai_date()
-        start_date = datetime.combine(today, datetime.min.time()).isoformat()
-        end_date = datetime.combine(today, datetime.max.time()).isoformat()
+        
+        # Определяем период для статистики
+        if period == 'week':
+            start_date = datetime.combine(today - timedelta(days=6), datetime.min.time()).isoformat()
+            end_date = datetime.combine(today, datetime.max.time()).isoformat()
+        elif period == 'month':
+            start_date = datetime.combine(today - timedelta(days=29), datetime.min.time()).isoformat()
+            end_date = datetime.combine(today, datetime.max.time()).isoformat()
+        else:  # today
+            start_date = datetime.combine(today, datetime.min.time()).isoformat()
+            end_date = datetime.combine(today, datetime.max.time()).isoformat()
         
         # Последнее кормление
         cur.execute("""

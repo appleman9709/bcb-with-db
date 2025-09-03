@@ -36,9 +36,16 @@
                     </div>
                 </div>
 
-                <!-- Статистика за сегодня -->
-                <div class="today-stats">
-                    <h3>📊 Сегодня</h3>
+                <!-- Статистика -->
+                <div class="stats-section">
+                    <div class="stats-header">
+                        <h3>📊 Статистика</h3>
+                        <div class="period-selector">
+                            <button class="period-btn active" data-period="today">Сегодня</button>
+                            <button class="period-btn" data-period="week">Неделя</button>
+                            <button class="period-btn" data-period="month">Месяц</button>
+                        </div>
+                    </div>
                     <div class="stats-grid">
                         <div class="stat-card feeding">
                             <div class="stat-icon">🍼</div>
@@ -66,6 +73,41 @@
                             <div class="stat-content">
                                 <div class="stat-number" id="todayActivities">0</div>
                                 <div class="stat-label">Активности</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Настройки -->
+                <div class="settings-section">
+                    <h3>⚙️ Настройки</h3>
+                    <div class="settings-grid">
+                        <div class="setting-card">
+                            <div class="setting-icon">🍼</div>
+                            <div class="setting-content">
+                                <div class="setting-title">Интервал кормления</div>
+                                <div class="setting-value" id="feedInterval">3 часа</div>
+                            </div>
+                        </div>
+                        <div class="setting-card">
+                            <div class="setting-icon">🧷</div>
+                            <div class="setting-content">
+                                <div class="setting-title">Интервал подгузников</div>
+                                <div class="setting-value" id="diaperInterval">2 часа</div>
+                            </div>
+                        </div>
+                        <div class="setting-card">
+                            <div class="setting-icon">🛁</div>
+                            <div class="setting-content">
+                                <div class="setting-title">Напоминания о купании</div>
+                                <div class="setting-value" id="bathReminders">Включены</div>
+                            </div>
+                        </div>
+                        <div class="setting-card">
+                            <div class="setting-icon">🎮</div>
+                            <div class="setting-content">
+                                <div class="setting-title">Напоминания об активности</div>
+                                <div class="setting-value" id="activityReminders">Включены</div>
                             </div>
                         </div>
                     </div>

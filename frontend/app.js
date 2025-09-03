@@ -2,6 +2,7 @@
 const API_BASE_URL = window.APP_CONFIG.API_BASE_URL;
 let currentFamilyId = null;
 let historyChart = null;
+let currentPeriod = 'today';
 
 // Инициализация приложения
 document.addEventListener('DOMContentLoaded', function() {
@@ -25,10 +26,36 @@ async function initializeApp() {
         // Загружаем список семей (автоматически выберет Коршиковых)
         await loadFamilies();
         
+        // Добавляем обработчики для переключателя периодов
+        setupPeriodSelector();
+        
     } catch (error) {
         console.error('Ошибка инициализации:', error);
         showError('Ошибка инициализации приложения');
     }
+}
+
+// Настройка переключателя периодов
+function setupPeriodSelector() {
+    const periodButtons = document.querySelectorAll('.period-btn');
+    
+    periodButtons.forEach(button => {
+        button.addEventListener('click', async function() {
+            // Убираем активный класс со всех кнопок
+            periodButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // Добавляем активный класс к нажатой кнопке
+            this.classList.add('active');
+            
+            // Обновляем текущий период
+            currentPeriod = this.dataset.period;
+            
+            // Перезагружаем дашборд с новым периодом
+            if (currentFamilyId) {
+                await loadDashboard(currentFamilyId);
+            }
+        });
+    });
 }
 
 // Загрузка списка семей
@@ -92,16 +119,23 @@ async function loadDashboard(familyId) {
         showLoading();
         currentFamilyId = familyId;
         
-        // Загружаем данные дашборда
-        const dashboardResponse = await fetch(`${API_BASE_URL}/family/${familyId}/dashboard`);
+        // Загружаем данные дашборда с учетом периода
+        const dashboardResponse = await fetch(`${API_BASE_URL}/family/${familyId}/dashboard?period=${currentPeriod}`);
         if (!dashboardResponse.ok) {
             throw new Error(`HTTP error! status: ${dashboardResponse.status}`);
         }
         
         const dashboardData = await dashboardResponse.json();
         
-        // Загружаем историю
-        const historyResponse = await fetch(`${API_BASE_URL}/family/${familyId}/history?days=7`);
+        // Загружаем историю в зависимости от выбранного периода
+        let days = 1; // по умолчанию сегодня
+        if (currentPeriod === 'week') {
+            days = 7;
+        } else if (currentPeriod === 'month') {
+            days = 30;
+        }
+        
+        const historyResponse = await fetch(`${API_BASE_URL}/family/${familyId}/history?days=${days}`);
         if (!historyResponse.ok) {
             throw new Error(`HTTP error! status: ${historyResponse.status}`);
         }
@@ -147,11 +181,14 @@ function displayDashboard(data) {
         document.getElementById('babyBirthDate').textContent = '';
     }
     
-    // Статистика за сегодня
+    // Статистика за выбранный период
     document.getElementById('todayFeedings').textContent = data.today_stats.feedings;
     document.getElementById('todayDiapers').textContent = data.today_stats.diapers;
     document.getElementById('todayBaths').textContent = data.today_stats.baths;
     document.getElementById('todayActivities').textContent = data.today_stats.activities;
+    
+    // Настройки
+    displaySettings(data.settings);
     
     // Последние события
     displayLastEvent('feeding', data.last_events.feeding, data.settings.feed_interval);
@@ -401,3 +438,22 @@ window.addEventListener('online', () => {
 window.addEventListener('offline', () => {
     showError('Нет подключения к интернету');
 });
+
+// Отображение настроек
+function displaySettings(settings) {
+    // Интервал кормления
+    const feedInterval = settings.feed_interval || 3;
+    document.getElementById('feedInterval').textContent = `${feedInterval} часа`;
+    
+    // Интервал подгузников
+    const diaperInterval = settings.diaper_interval || 2;
+    document.getElementById('diaperInterval').textContent = `${diaperInterval} часа`;
+    
+    // Напоминания о купании
+    const bathReminders = settings.bath_reminder_enabled ? 'Включены' : 'Выключены';
+    document.getElementById('bathReminders').textContent = bathReminders;
+    
+    // Напоминания об активности
+    const activityReminders = settings.activity_reminder_enabled ? 'Включены' : 'Выключены';
+    document.getElementById('activityReminders').textContent = activityReminders;
+}
