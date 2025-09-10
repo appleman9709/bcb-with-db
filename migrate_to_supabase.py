@@ -27,27 +27,54 @@ headers = {
     'Content-Type': 'application/json'
 }
 
-def make_supabase_request(method, endpoint, data=None):
+def make_supabase_request(method, endpoint, data=None, params=None):
     """Выполняет HTTP запрос к Supabase"""
     url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
     
     try:
         if method == 'GET':
-            response = requests.get(url, headers=headers, params=data)
+            response = requests.get(url, headers=headers, params=params)
         elif method == 'POST':
             response = requests.post(url, headers=headers, json=data)
         elif method == 'PATCH':
-            response = requests.patch(url, headers=headers, json=data)
+            response = requests.patch(url, headers=headers, json=data, params=params)
         elif method == 'DELETE':
-            response = requests.delete(url, headers=headers)
+            response = requests.delete(url, headers=headers, params=params)
         else:
             raise ValueError(f"Unsupported method: {method}")
         
+        if response.status_code == 409:
+            print(f"   ⚠️ Запись уже существует (409 Conflict)")
+            return None
+        
         response.raise_for_status()
-        return response.json() if response.content else None
+        if response.content:
+            return response.json()
+        else:
+            # Для POST запросов возвращаем True если статус 201
+            return True if response.status_code == 201 else None
     except requests.exceptions.RequestException as e:
         print(f"❌ Ошибка Supabase запроса: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"   Детали: {e.response.text}")
         return None
+
+def clear_supabase_data():
+    """Очищает данные в Supabase (в порядке зависимостей)"""
+    print("🧹 Очистка существующих данных в Supabase...")
+    
+    # Удаляем в порядке зависимостей (от дочерних к родительским)
+    tables = [
+        'feedings', 'diapers', 'baths', 'activities', 'sleep_sessions',
+        'family_members', 'settings', 'families'
+    ]
+    
+    for table in tables:
+        try:
+            result = make_supabase_request('DELETE', table)
+            print(f"   ✅ Очищена таблица: {table}")
+        except Exception as e:
+            print(f"   ⚠️ Ошибка очистки {table}: {e}")
 
 def migrate_families(sqlite_conn):
     """Мигрирует семьи"""
@@ -59,13 +86,26 @@ def migrate_families(sqlite_conn):
     
     migrated_count = 0
     for family_id, name in families:
-        data = {'name': name}
-        result = make_supabase_request('POST', 'families', data)
-        if result:
-            print(f"   ✅ Семья '{name}' (ID: {family_id}) -> Supabase ID: {result['id']}")
+        # Проверяем, существует ли семья с таким именем
+        existing = make_supabase_request('GET', 'families', params={'name': f'eq.{name}'})
+        
+        if existing and len(existing) > 0:
+            print(f"   ⚠️ Семья '{name}' уже существует, пропускаем")
             migrated_count += 1
         else:
-            print(f"   ❌ Ошибка миграции семьи '{name}'")
+            data = {'name': name}
+            result = make_supabase_request('POST', 'families', data)
+            if result:
+                # Получаем ID созданной семьи
+                families = make_supabase_request('GET', 'families', params={'name': f'eq.{name}'})
+                if families and len(families) > 0:
+                    supabase_id = families[-1]['id']
+                    print(f"   ✅ Семья '{name}' (ID: {family_id}) -> Supabase ID: {supabase_id}")
+                else:
+                    print(f"   ✅ Семья '{name}' создана")
+                migrated_count += 1
+            else:
+                print(f"   ❌ Ошибка миграции семьи '{name}'")
     
     print(f"📊 Мигрировано семей: {migrated_count}/{len(families)}")
     return migrated_count
@@ -74,24 +114,50 @@ def migrate_family_members(sqlite_conn):
     """Мигрирует членов семьи"""
     print("👥 Миграция членов семьи...")
     
+    # Получаем mapping SQLite family_id -> Supabase family_id
+    family_mapping = {}
     cursor = sqlite_conn.cursor()
+    cursor.execute("SELECT id, name FROM families")
+    sqlite_families = cursor.fetchall()
+    
+    for sqlite_id, name in sqlite_families:
+        # Находим соответствующую семью в Supabase
+        supabase_families = make_supabase_request('GET', 'families', params={'name': f'eq.{name}'})
+        if supabase_families and len(supabase_families) > 0:
+            family_mapping[sqlite_id] = supabase_families[-1]['id']
+            print(f"   📋 Mapping: SQLite family {sqlite_id} -> Supabase family {supabase_families[-1]['id']}")
+    
     cursor.execute("SELECT family_id, user_id, role, name FROM family_members")
     members = cursor.fetchall()
     
     migrated_count = 0
     for family_id, user_id, role, name in members:
-        data = {
-            'family_id': family_id,
-            'user_id': user_id,
-            'role': role,
-            'name': name
-        }
-        result = make_supabase_request('POST', 'family_members', data)
-        if result:
-            print(f"   ✅ Член семьи '{name}' (роль: {role})")
+        # Получаем Supabase family_id
+        supabase_family_id = family_mapping.get(family_id)
+        if not supabase_family_id:
+            print(f"   ❌ Не найден Supabase ID для семьи {family_id}")
+            continue
+            
+        # Проверяем, существует ли член семьи
+        existing = make_supabase_request('GET', 'family_members', 
+                                       params={'family_id': f'eq.{supabase_family_id}', 'user_id': f'eq.{user_id}'})
+        
+        if existing and len(existing) > 0:
+            print(f"   ⚠️ Член семьи '{name}' уже существует, пропускаем")
             migrated_count += 1
         else:
-            print(f"   ❌ Ошибка миграции члена семьи '{name}'")
+            data = {
+                'family_id': supabase_family_id,
+                'user_id': user_id,
+                'role': role,
+                'name': name
+            }
+            result = make_supabase_request('POST', 'family_members', data)
+            if result:
+                print(f"   ✅ Член семьи '{name}' (роль: {role})")
+                migrated_count += 1
+            else:
+                print(f"   ❌ Ошибка миграции члена семьи '{name}'")
     
     print(f"📊 Мигрировано членов семьи: {migrated_count}/{len(members)}")
     return migrated_count
@@ -251,28 +317,37 @@ def migrate_settings(sqlite_conn):
          activity_reminder_enabled, activity_reminder_interval,
          sleep_monitoring_enabled, baby_age_months, birth_date) in settings:
         
-        data = {
-            'family_id': family_id,
-            'feed_interval': feed_interval,
-            'diaper_interval': diaper_interval,
-            'tips_enabled': bool(tips_enabled),
-            'tips_time_hour': tips_time_hour,
-            'tips_time_minute': tips_time_minute,
-            'bath_reminder_enabled': bool(bath_reminder_enabled),
-            'bath_reminder_hour': bath_reminder_hour,
-            'bath_reminder_minute': bath_reminder_minute,
-            'bath_reminder_period': bath_reminder_period,
-            'activity_reminder_enabled': bool(activity_reminder_enabled),
-            'activity_reminder_interval': activity_reminder_interval,
-            'sleep_monitoring_enabled': bool(sleep_monitoring_enabled),
-            'baby_age_months': baby_age_months,
-            'baby_birth_date': birth_date
-        }
-        result = make_supabase_request('POST', 'settings', data)
-        if result:
+        # Проверяем, существуют ли настройки для семьи
+        existing = make_supabase_request('GET', 'settings', 
+                                       params={'family_id': f'eq.{family_id}'})
+        
+        if existing and len(existing) > 0:
+            print(f"   ⚠️ Настройки для семьи {family_id} уже существуют, пропускаем")
             migrated_count += 1
         else:
-            print(f"   ❌ Ошибка миграции настроек для семьи {family_id}")
+            data = {
+                'family_id': family_id,
+                'feed_interval': feed_interval,
+                'diaper_interval': diaper_interval,
+                'tips_enabled': bool(tips_enabled),
+                'tips_time_hour': tips_time_hour,
+                'tips_time_minute': tips_time_minute,
+                'bath_reminder_enabled': bool(bath_reminder_enabled),
+                'bath_reminder_hour': bath_reminder_hour,
+                'bath_reminder_minute': bath_reminder_minute,
+                'bath_reminder_period': bath_reminder_period,
+                'activity_reminder_enabled': bool(activity_reminder_enabled),
+                'activity_reminder_interval': activity_reminder_interval,
+                'sleep_monitoring_enabled': bool(sleep_monitoring_enabled),
+                'baby_age_months': baby_age_months,
+                'baby_birth_date': birth_date
+            }
+            result = make_supabase_request('POST', 'settings', data)
+            if result:
+                print(f"   ✅ Настройки для семьи {family_id}")
+                migrated_count += 1
+            else:
+                print(f"   ❌ Ошибка миграции настроек для семьи {family_id}")
     
     print(f"📊 Мигрировано настроек: {migrated_count}/{len(settings)}")
     return migrated_count
@@ -281,6 +356,12 @@ def main():
     """Основная функция миграции"""
     print("🚀 Начинаем миграцию данных из SQLite в Supabase")
     print("=" * 50)
+    
+    # Спрашиваем, нужно ли очистить существующие данные
+    clear_data = input("🧹 Очистить существующие данные в Supabase? (y/N): ").lower().strip()
+    if clear_data in ['y', 'yes', 'да', 'д']:
+        clear_supabase_data()
+        print()
     
     # Проверяем наличие базы данных
     db_files = ['babybot.db', 'babybot_render.db']

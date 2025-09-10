@@ -3,222 +3,200 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BabyCareBot Dashboard</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>👶 BabyCareBot - Дашборд</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div id="app">
-        <!-- Заголовок -->
+    <div class="app">
+        <!-- Header -->
         <header class="header">
             <div class="header-content">
-                <h1 class="app-title">👶 BabyCareBot</h1>
+                <h1 class="logo">👶 BabyCareBot</h1>
+                <div class="user-info">
+                    <span id="user-name">Загрузка...</span>
+                    <button id="logout-btn" class="btn-secondary">Выйти</button>
+                </div>
             </div>
         </header>
 
-        <!-- Основной контент -->
-        <main class="main-content">
-            <!-- Загрузка -->
-            <div id="loading" class="loading">
-                <div class="spinner"></div>
-                <p>Загружаем данные...</p>
-            </div>
-
-            <!-- Дашборд -->
-            <div id="dashboard" class="dashboard hidden">
-                <!-- Информация о семье -->
-                <div class="family-info">
-                    <h2 id="familyName" class="family-name">Название семьи</h2>
-                    <div class="baby-info">
-                        <span id="babyAge" class="baby-age">Возраст: 0 мес.</span>
-                        <span id="babyBirthDate" class="baby-birth-date"></span>
-                    </div>
-                </div>
-
-                <!-- Статистика -->
-                <div class="stats-section">
-                    <div class="stats-header">
-                        <h3>📊 Статистика</h3>
-                        <div class="period-selector">
-                            <button class="period-btn active" data-period="today">Сегодня</button>
-                            <button class="period-btn" data-period="week">Неделя</button>
-                            <button class="period-btn" data-period="month">Месяц</button>
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Login Screen -->
+            <div id="login-screen" class="screen">
+                <div class="login-container">
+                    <div class="login-card">
+                        <h2>Добро пожаловать в BabyCareBot!</h2>
+                        <p>Войдите в систему или создайте новую семью</p>
+                        
+                        <div class="login-form">
+                            <div class="form-group">
+                                <label for="family-name">Название семьи</label>
+                                <input type="text" id="family-name" placeholder="Например: Семья Ивановых">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="user-name-input">Ваше имя</label>
+                                <input type="text" id="user-name-input" placeholder="Например: Анна">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="user-role">Ваша роль</label>
+                                <select id="user-role">
+                                    <option value="Мама">Мама</option>
+                                    <option value="Папа">Папа</option>
+                                    <option value="Бабушка">Бабушка</option>
+                                    <option value="Дедушка">Дедушка</option>
+                                    <option value="Няня">Няня</option>
+                                </select>
+                            </div>
+                            
+                            <button id="login-btn" class="btn-primary">Войти / Создать семью</button>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Screen -->
+            <div id="dashboard-screen" class="screen hidden">
+                <!-- Quick Actions -->
+                <section class="quick-actions">
+                    <h2>Быстрые действия</h2>
+                    <div class="action-grid">
+                        <button class="action-btn" data-action="feeding">
+                            <span class="icon">🍼</span>
+                            <span class="label">Кормление</span>
+                        </button>
+                        <button class="action-btn" data-action="diaper">
+                            <span class="icon">👶</span>
+                            <span class="label">Подгузник</span>
+                        </button>
+                        <button class="action-btn" data-action="bath">
+                            <span class="icon">🛁</span>
+                            <span class="label">Купание</span>
+                        </button>
+                        <button class="action-btn" data-action="activity">
+                            <span class="icon">🎮</span>
+                            <span class="label">Активность</span>
+                        </button>
+                        <button class="action-btn" data-action="sleep">
+                            <span class="icon">😴</span>
+                            <span class="label">Сон</span>
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Stats Overview -->
+                <section class="stats-overview">
+                    <h2>Статистика за сегодня</h2>
                     <div class="stats-grid">
-                        <div class="stat-card feeding">
+                        <div class="stat-card">
                             <div class="stat-icon">🍼</div>
                             <div class="stat-content">
-                                <div class="stat-number" id="todayFeedings">0</div>
-                                <div class="stat-label">Кормления</div>
+                                <div class="stat-number" id="feedings-count">0</div>
+                                <div class="stat-label">Кормлений</div>
                             </div>
                         </div>
-                        <div class="stat-card diaper">
-                            <div class="stat-icon">🧷</div>
+                        <div class="stat-card">
+                            <div class="stat-icon">👶</div>
                             <div class="stat-content">
-                                <div class="stat-number" id="todayDiapers">0</div>
-                                <div class="stat-label">Подгузники</div>
+                                <div class="stat-number" id="diapers-count">0</div>
+                                <div class="stat-label">Подгузников</div>
                             </div>
                         </div>
-                        <div class="stat-card bath">
+                        <div class="stat-card">
                             <div class="stat-icon">🛁</div>
                             <div class="stat-content">
-                                <div class="stat-number" id="todayBaths">0</div>
-                                <div class="stat-label">Купания</div>
+                                <div class="stat-number" id="baths-count">0</div>
+                                <div class="stat-label">Купаний</div>
                             </div>
                         </div>
-                        <div class="stat-card activity">
+                        <div class="stat-card">
                             <div class="stat-icon">🎮</div>
                             <div class="stat-content">
-                                <div class="stat-number" id="todayActivities">0</div>
-                                <div class="stat-label">Активности</div>
+                                <div class="stat-number" id="activities-count">0</div>
+                                <div class="stat-label">Активностей</div>
                             </div>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <!-- Настройки -->
-                <div class="settings-section">
-                    <h3>⚙️ Настройки</h3>
-                    <div class="settings-grid">
-                        <div class="setting-card">
-                            <div class="setting-icon">🍼</div>
-                            <div class="setting-content">
-                                <div class="setting-title">Интервал кормления</div>
-                                <div class="setting-value" id="feedInterval">3 часа</div>
+                <!-- Last Events -->
+                <section class="last-events">
+                    <h2>Последние события</h2>
+                    <div class="events-list" id="events-list">
+                        <div class="loading">Загрузка...</div>
+                    </div>
+                </section>
+
+                <!-- Sleep Status -->
+                <section class="sleep-status">
+                    <h2>Сон</h2>
+                    <div class="sleep-card" id="sleep-card">
+                        <div class="sleep-info">
+                            <div class="sleep-icon">😴</div>
+                            <div class="sleep-details">
+                                <div class="sleep-status-text" id="sleep-status">Не спит</div>
+                                <div class="sleep-duration" id="sleep-duration"></div>
                             </div>
                         </div>
-                        <div class="setting-card">
-                            <div class="setting-icon">🧷</div>
-                            <div class="setting-content">
-                                <div class="setting-title">Интервал подгузников</div>
-                                <div class="setting-value" id="diaperInterval">2 часа</div>
-                            </div>
-                        </div>
-                        <div class="setting-card">
-                            <div class="setting-icon">🛁</div>
-                            <div class="setting-content">
-                                <div class="setting-title">Напоминания о купании</div>
-                                <div class="setting-value" id="bathReminders">Включены</div>
-                            </div>
-                        </div>
-                        <div class="setting-card">
-                            <div class="setting-icon">🎮</div>
-                            <div class="setting-content">
-                                <div class="setting-title">Напоминания об активности</div>
-                                <div class="setting-value" id="activityReminders">Включены</div>
-                            </div>
-                        </div>
+                        <button class="sleep-btn" id="sleep-btn">Начать сон</button>
                     </div>
-                </div>
+                </section>
 
-                <!-- Последние события -->
-                <div class="last-events">
-                    <h3>⏰ Последние события</h3>
-                    
-                    <!-- Кормление -->
-                    <div class="event-card feeding" id="lastFeeding">
-                        <div class="event-icon">🍼</div>
-                        <div class="event-content">
-                            <div class="event-title">Кормление</div>
-                            <div class="event-time" id="lastFeedingTime">Нет данных</div>
-                            <div class="event-author" id="lastFeedingAuthor"></div>
-                        </div>
-                        <div class="event-status" id="feedingStatus"></div>
-                    </div>
-
-                    <!-- Подгузник -->
-                    <div class="event-card diaper" id="lastDiaper">
-                        <div class="event-icon">🧷</div>
-                        <div class="event-content">
-                            <div class="event-title">Смена подгузника</div>
-                            <div class="event-time" id="lastDiaperTime">Нет данных</div>
-                            <div class="event-author" id="lastDiaperAuthor"></div>
-                        </div>
-                        <div class="event-status" id="diaperStatus"></div>
-                    </div>
-
-                    <!-- Купание -->
-                    <div class="event-card bath" id="lastBath">
-                        <div class="event-icon">🛁</div>
-                        <div class="event-content">
-                            <div class="event-title">Купание</div>
-                            <div class="event-time" id="lastBathTime">Нет данных</div>
-                            <div class="event-author" id="lastBathAuthor"></div>
-                        </div>
-                        <div class="event-status" id="bathStatus"></div>
-                    </div>
-
-                    <!-- Активность -->
-                    <div class="event-card activity" id="lastActivity">
-                        <div class="event-icon">🎮</div>
-                        <div class="event-content">
-                            <div class="event-title">Активность</div>
-                            <div class="event-time" id="lastActivityTime">Нет данных</div>
-                            <div class="event-author" id="lastActivityAuthor"></div>
-                        </div>
-                        <div class="event-status" id="activityStatus"></div>
-                    </div>
-                </div>
-
-                <!-- Сон -->
-                <div class="sleep-section">
-                    <h3>😴 Сон</h3>
-                    <div class="sleep-card" id="sleepCard">
-                        <div class="sleep-icon">🌙</div>
-                        <div class="sleep-content">
-                            <div class="sleep-status" id="sleepStatus">Малыш не спит</div>
-                            <div class="sleep-duration" id="sleepDuration"></div>
-                            <div class="sleep-author" id="sleepAuthor"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- График истории -->
-                <div class="history-section">
-                    <h3>📈 История (7 дней)</h3>
+                <!-- Charts -->
+                <section class="charts">
+                    <h2>История за неделю</h2>
                     <div class="chart-container">
-                        <canvas id="historyChart"></canvas>
+                        <canvas id="history-chart"></canvas>
                     </div>
-                </div>
+                </section>
 
-                <!-- Члены семьи -->
-                <div class="family-members">
-                    <h3>👥 Члены семьи</h3>
-                    <div class="members-list" id="membersList">
-                        <!-- Члены семьи будут загружены динамически -->
+                <!-- Family Members -->
+                <section class="family-members">
+                    <h2>Члены семьи</h2>
+                    <div class="members-list" id="members-list">
+                        <div class="loading">Загрузка...</div>
                     </div>
-                </div>
-            </div>
-
-            <!-- Ошибка -->
-            <div id="error" class="error hidden">
-                <div class="error-icon">❌</div>
-                <h3>Ошибка загрузки</h3>
-                <p id="errorMessage">Не удалось загрузить данные</p>
-                <button class="retry-btn" onclick="loadDashboard()">Повторить</button>
+                </section>
             </div>
         </main>
 
-        <!-- Выбор семьи -->
-        <div class="family-selector-bottom">
-            <div class="family-selector-content">
-                <label for="familySelect" class="family-select-label">Семья:</label>
-                <select id="familySelect" class="family-select">
-                    <option value="">Выберите семью...</option>
-                </select>
+        <!-- Modal for adding events -->
+        <div id="event-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modal-title">Добавить событие</h3>
+                    <button class="close-btn" id="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="event-author">Кто добавил:</label>
+                        <input type="text" id="event-author" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="event-time">Время:</label>
+                        <input type="datetime-local" id="event-time">
+                    </div>
+                    <div class="form-group" id="activity-type-group" style="display: none;">
+                        <label for="activity-type">Тип активности:</label>
+                        <select id="activity-type">
+                            <option value="tummy_time">Выкладывание на живот</option>
+                            <option value="play">Игра</option>
+                            <option value="walk">Прогулка</option>
+                            <option value="massage">Массаж</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" id="cancel-event">Отмена</button>
+                    <button class="btn-primary" id="save-event">Сохранить</button>
+                </div>
             </div>
         </div>
-
-        <!-- Футер -->
-        <footer class="footer">
-            <p>BabyCareBot Dashboard v1.0</p>
-        </footer>
     </div>
 
-    <!-- Chart.js для графиков -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="config.js"></script>
     <script src="app.js"></script>
 </body>
