@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success { border-left: 4px solid #28a745; }
+        .error { border-left: 4px solid #dc3545; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Тест API BabyCareBot</h1>
+    
+    <div class="test-section">
+        <h2>1. Проверка Health Check</h2>
+        <button onclick="testHealth()">Тест Health</button>
+        <div id="health-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Создание семьи</h2>
+        <input type="text" id="family-name" placeholder="Название семьи" value="Тестовая Семья">
+        <button onclick="testCreateFamily()">Создать семью</button>
+        <div id="family-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Получение списка семей</h2>
+        <button onclick="testGetFamilies()">Получить семьи</button>
+        <div id="families-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. Добавление члена семьи</h2>
+        <input type="number" id="family-id" placeholder="ID семьи">
+        <input type="text" id="member-name" placeholder="Имя члена семьи" value="Тестовый Пользователь">
+        <button onclick="testAddMember()">Добавить члена</button>
+        <div id="member-result" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://your-api-project.vercel.app/api';
+        
+        async function makeRequest(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                
+                const data = await response.json();
+                return {
+                    success: response.ok,
+                    status: response.status,
+                    data: data
+                };
+            } catch (error) {
+                return {
+                    success: false,
+                    error: error.message
+                };
+            }
+        }
+        
+        function showResult(elementId, result) {
+            const element = document.getElementById(elementId);
+            element.textContent = JSON.stringify(result, null, 2);
+            element.className = `result ${result.success ? 'success' : 'error'}`;
+        }
+        
+        async function testHealth() {
+            const result = await makeRequest(`${API_BASE_URL}/health`);
+            showResult('health-result', result);
+        }
+        
+        async function testCreateFamily() {
+            const familyName = document.getElementById('family-name').value;
+            const result = await makeRequest(`${API_BASE_URL}/families`, {
+                method: 'POST',
+                body: JSON.stringify({ name: familyName })
+            });
+            showResult('family-result', result);
+        }
+        
+        async function testGetFamilies() {
+            const result = await makeRequest(`${API_BASE_URL}/families`);
+            showResult('families-result', result);
+        }
+        
+        async function testAddMember() {
+            const familyId = document.getElementById('family-id').value;
+            const memberName = document.getElementById('member-name').value;
+            
+            if (!familyId) {
+                showResult('member-result', {
+                    success: false,
+                    error: 'Введите ID семьи'
+                });
+                return;
+            }
+            
+            const result = await makeRequest(`${API_BASE_URL}/family/${familyId}/members`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    user_id: Date.now(),
+                    name: memberName,
+                    role: 'Родитель'
+                })
+            });
+            showResult('member-result', result);
+        }
+    </script>
+</body>
+</html>

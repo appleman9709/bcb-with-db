@@ -2,11 +2,11 @@
   "name": "babycarebot-api",
   "version": "1.0.0",
   "description": "BabyCareBot API для Vercel",
-  "main": "index.js",
+  "type": "module",
   "scripts": {
     "dev": "vercel dev",
     "build": "echo 'No build step required'",
-    "start": "node index.js"
+    "start": "echo 'Starting Vercel functions'"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.38.0"
