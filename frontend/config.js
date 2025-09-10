@@ -4,9 +4,9 @@ const config = {
     development: {
         API_BASE_URL: 'http://localhost:3000/api'
     },
-    // Продакшн (Vercel)
+    // Продакшн (Vercel) - замените на ваш URL API
     production: {
-        API_BASE_URL: 'https://babycarebot-api.vercel.app/api'
+        API_BASE_URL: 'https://your-api-project.vercel.app/api'
     }
 };
 
