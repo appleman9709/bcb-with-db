@@ -94,30 +94,48 @@ class BabyCareBot {
     }
 
     async findOrCreateFamily(name) {
-        // Ищем существующую семью
-        const response = await fetch(`${window.APP_CONFIG.API_BASE_URL}/families`);
-        const data = await response.json();
-        
-        const existingFamily = data.families.find(f => f.name === name);
-        if (existingFamily) {
-            return existingFamily;
+        try {
+            // Ищем существующую семью
+            const response = await fetch(`${window.APP_CONFIG.API_BASE_URL}/families`);
+            
+            if (!response.ok) {
+                console.error('Ошибка загрузки семей:', response.status, response.statusText);
+                throw new Error('Ошибка загрузки семей');
+            }
+            
+            const data = await response.json();
+            console.log('Загружены семьи:', data);
+            
+            const existingFamily = data.families?.find(f => f.name === name);
+            if (existingFamily) {
+                console.log('Найдена существующая семья:', existingFamily);
+                return existingFamily;
+            }
+            
+            // Создаем новую семью
+            console.log('Создаем новую семью:', name);
+            const createResponse = await fetch(`${window.APP_CONFIG.API_BASE_URL}/families`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name })
+            });
+            
+            if (!createResponse.ok) {
+                const errorText = await createResponse.text();
+                console.error('Ошибка создания семьи:', createResponse.status, errorText);
+                throw new Error(`Ошибка создания семьи: ${createResponse.status}`);
+            }
+            
+            const newFamily = await createResponse.json();
+            console.log('Создана новая семья:', newFamily);
+            return newFamily;
+            
+        } catch (error) {
+            console.error('Ошибка в findOrCreateFamily:', error);
+            throw error;
         }
-        
-        // Создаем новую семью
-        const createResponse = await fetch(`${window.APP_CONFIG.API_BASE_URL}/families`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ name })
-        });
-        
-        if (!createResponse.ok) {
-            throw new Error('Ошибка создания семьи');
-        }
-        
-        const newFamily = await createResponse.json();
-        return newFamily;
     }
 
     async findOrCreateUser(familyId, name, role) {
