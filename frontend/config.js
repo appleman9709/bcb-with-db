@@ -2,11 +2,11 @@
 const config = {
     // Локальная разработка
     development: {
-        API_BASE_URL: 'https://bcb-db.vercel.app/api'
+        API_BASE_URL: 'http://localhost:3000/api'
     },
     // Продакшн (Vercel)
     production: {
-        API_BASE_URL: 'https://babycarebot-api.onrender.com/api'
+        API_BASE_URL: 'https://babycarebot-api.vercel.app/api'
     }
 };
 

@@ -9,6 +9,7 @@ import time
 import http.server
 import socketserver
 import pytz
+import subprocess
 
 # Конфигурация (загружается из переменных окружения)
 import os
@@ -52,6 +53,27 @@ def get_thai_time():
 def get_thai_date():
     """Получить текущую дату в тайском часовом поясе"""
     return get_thai_time().date()
+
+def sync_to_render():
+    """Синхронизирует локальную базу данных с Render в фоновом режиме"""
+    def sync_worker():
+        try:
+            # Копируем базу данных
+            import shutil
+            shutil.copy2("babybot.db", "babybot_render.db")
+            
+            # Добавляем в Git и отправляем
+            subprocess.run(["git", "add", "babybot_render.db"], check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", f"Auto-sync: {datetime.now().strftime('%H:%M:%S')}"], check=True, capture_output=True)
+            subprocess.run(["git", "push", "origin", "main"], check=True, capture_output=True)
+            
+            print("✅ Данные синхронизированы с Render")
+        except Exception as e:
+            print(f"⚠️ Ошибка синхронизации с Render: {e}")
+    
+    # Запускаем синхронизацию в отдельном потоке
+    thread = threading.Thread(target=sync_worker, daemon=True)
+    thread.start()
 
 # Функция для внешнего keep-alive (для Render)
 def external_keep_alive():
@@ -191,7 +213,7 @@ def init_db():
             activity_reminder_interval INTEGER DEFAULT 2,
             sleep_monitoring_enabled INTEGER DEFAULT 1,
             baby_age_months INTEGER DEFAULT 0,
-            baby_birth_date TEXT,
+            birth_date TEXT,
             FOREIGN KEY (family_id) REFERENCES families (id)
         )
     """)
@@ -265,6 +287,12 @@ def init_db():
         print("✅ Добавлена колонка baby_birth_date")
     except sqlite3.OperationalError:
         print("ℹ️ Колонка baby_birth_date уже существует")
+    
+    try:
+        cur.execute("ALTER TABLE settings ADD COLUMN birth_date TEXT")
+        print("✅ Добавлена колонка birth_date")
+    except sqlite3.OperationalError:
+        print("ℹ️ Колонка birth_date уже существует")
     
     # Обновляем существующие записи, устанавливая значения по умолчанию
     cur.execute("UPDATE settings SET tips_time_hour = 9 WHERE tips_time_hour IS NULL")
@@ -388,6 +416,14 @@ def create_family(name, user_id):
     conn.close()
     return family_id
 
+def get_birth_date(family_id):
+    """Получить дату рождения малыша (используем существующую систему)"""
+    return get_baby_birth_date(family_id)
+
+def set_birth_date(family_id, birth_date):
+    """Установить дату рождения малыша (используем существующую систему)"""
+    set_baby_birth_date(family_id, birth_date)
+
 def join_family_by_code(code, user_id):
     """Присоединить пользователя к семье по коду приглашения"""
     try:
@@ -481,6 +517,9 @@ def add_feeding(user_id, minutes_ago=0):
                 (family_id, user_id, timestamp.isoformat(), role, name))
     conn.commit()
     conn.close()
+    
+    # Синхронизируем с Render
+    sync_to_render()
 
 def add_diaper_change(user_id, minutes_ago=0):
     conn = sqlite3.connect("babybot.db")
@@ -500,6 +539,9 @@ def add_diaper_change(user_id, minutes_ago=0):
                 (family_id, user_id, timestamp.isoformat(), role, name))
     conn.commit()
     conn.close()
+    
+    # Синхронизируем с Render
+    sync_to_render()
 
 def get_last_feeding_time(user_id):
     conn = sqlite3.connect("babybot.db")
@@ -535,6 +577,18 @@ def get_last_feeding_time_for_family(family_id):
     cur = conn.cursor()
     
     cur.execute("SELECT timestamp FROM feedings WHERE family_id = ? ORDER BY timestamp DESC LIMIT 1", (family_id,))
+    result = cur.fetchone()
+    conn.close()
+    if result:
+        return datetime.fromisoformat(result[0])
+    return None
+
+def get_last_diaper_change_time_for_family(family_id):
+    """Получить время последней смены подгузника для семьи"""
+    conn = sqlite3.connect("babybot.db")
+    cur = conn.cursor()
+    
+    cur.execute("SELECT timestamp FROM diapers WHERE family_id = ? ORDER BY timestamp DESC LIMIT 1", (family_id,))
     result = cur.fetchone()
     conn.close()
     if result:
@@ -643,10 +697,11 @@ def get_random_tip():
         tips = []
         
         # Читаем советы из CSV файла
-        with open("data/advice.csv", "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
+        with open("data/advice2.csv", "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f, delimiter=';')
             for row in reader:
-                tips.append(row["tip"])
+                if 'tip' in row and row['tip'].strip():
+                    tips.append(row['tip'].strip())
         
         if tips:
             return random.choice(tips)
@@ -657,6 +712,112 @@ def get_random_tip():
         print(f"Ошибка при чтении советов: {e}")
         # Возвращаем запасной совет в случае ошибки
         return "Помните, что каждый ребенок уникален и развивается в своем темпе."
+
+def get_baby_age_in_months(family_id):
+    """Получить возраст малыша в месяцах на основе даты рождения"""
+    try:
+        # Используем существующую функцию для получения даты рождения
+        birth_date_str = get_baby_birth_date(family_id)
+        
+        if birth_date_str:
+            # Парсим дату в формате YYYY-MM-DD
+            birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d")
+            now = get_thai_time()
+            
+            # Убеждаемся, что обе даты имеют одинаковый тип (без timezone)
+            if birth_date.tzinfo is None and now.tzinfo is not None:
+                birth_date = birth_date.replace(tzinfo=now.tzinfo)
+            elif birth_date.tzinfo is not None and now.tzinfo is None:
+                now = now.replace(tzinfo=birth_date.tzinfo)
+            
+            age_delta = now - birth_date
+            age_months = age_delta.days / 30.44  # Среднее количество дней в месяце
+            return int(age_months)
+        
+        return None
+    except Exception as e:
+        print(f"Ошибка при получении возраста малыша: {e}")
+        return None
+
+def get_age_based_tip(family_id):
+    """Получить совет на основе возраста малыша"""
+    try:
+        age_months = get_baby_age_in_months(family_id)
+        
+        if age_months is None:
+            # Если возраст неизвестен, возвращаем общий совет
+            return get_random_tip()
+        
+        # Определяем возрастную группу
+        if age_months < 1:
+            age_group = "newborn"
+        elif age_months < 3:
+            age_group = "0-3_months"
+        elif age_months < 6:
+            age_group = "3-6_months"
+        elif age_months < 9:
+            age_group = "6-9_months"
+        elif age_months < 12:
+            age_group = "9-12_months"
+        else:
+            age_group = "12+_months"
+        
+        # Возрастные советы
+        age_tips = {
+            "newborn": [
+                "👶 Новорожденный: Держите малыша как можно чаще на руках - это успокаивает и укрепляет связь!",
+                "🍼 Новорожденный: Кормите по требованию, не по расписанию - малыш сам знает, когда голоден!",
+                "😴 Новорожденный: Сон новорожденного может быть беспокойным - это нормально!",
+                "🧷 Новорожденный: Меняйте подгузник каждые 2-3 часа или сразу после загрязнения.",
+                "🛁 Новорожденный: Купайте малыша в воде 36-37°C - это комфортная температура для него."
+            ],
+            "0-3_months": [
+                "👶 0-3 месяца: Малыш начинает улыбаться! Отвечайте на его улыбки - это важно для развития!",
+                "🍼 0-3 месяца: Интервалы между кормлениями постепенно увеличиваются до 3-4 часов.",
+                "😴 0-3 месяца: Помогайте малышу различать день и ночь - днем больше активности, ночью тишина.",
+                "🧷 0-3 месяца: Следите за чистотой кожи - используйте защитный крем при необходимости.",
+                "🎯 0-3 месяца: Выкладывайте малыша на живот на 2-3 минуты несколько раз в день."
+            ],
+            "3-6_months": [
+                "👶 3-6 месяцев: Малыш начинает переворачиваться! Обеспечьте безопасность!",
+                "🍼 3-6 месяцев: Можно начинать вводить прикорм, но только после консультации с врачом.",
+                "😴 3-6 месяцев: Сон становится более предсказуемым - устанавливается режим.",
+                "🧷 3-6 месяцев: Подгузники меняются реже - примерно каждые 4-6 часов.",
+                "🎯 3-6 месяцев: Играйте с малышом в простые игры - прятки, ладушки!"
+            ],
+            "6-9_months": [
+                "👶 6-9 месяцев: Малыш сидит и ползает! Создайте безопасное пространство для исследований!",
+                "🍼 6-9 месяцев: Прикорм становится важной частью рациона - разнообразьте меню!",
+                "😴 6-9 месяцев: Малыш может спать всю ночь - это нормально!",
+                "🧷 6-9 месяцев: Подгузники меняются реже, но следите за сухостью кожи.",
+                "🎯 6-9 месяцев: Читайте малышу книги - это развивает речь и воображение!"
+            ],
+            "9-12_months": [
+                "👶 9-12 месяцев: Малыш делает первые шаги! Поддерживайте и поощряйте!",
+                "🍼 9-12 месяцев: Малыш ест почти как взрослый - разнообразная пища важна!",
+                "😴 9-12 месяцев: Устанавливается четкий режим сна - 2 дневных сна.",
+                "🧷 9-12 месяцев: Можно начинать приучать к горшку, но не торопитесь!",
+                "🎯 9-12 месяцев: Играйте в развивающие игры - пирамидки, кубики, мячики!"
+            ],
+            "12+_months": [
+                "👶 12+ месяцев: Малыш активно ходит и говорит! Поощряйте его развитие!",
+                "🍼 12+ месяцев: Малыш ест за общим столом - приучайте к правильному питанию!",
+                "😴 12+ месяцев: Один дневной сон - это нормально для этого возраста.",
+                "🧷 12+ месяцев: Активно приучайте к горшку - терпение и похвала важны!",
+                "🎯 12+ месяцев: Читайте, играйте, общайтесь - малыш впитывает все как губка!"
+            ]
+        }
+        
+        # Получаем советы для возрастной группы
+        tips = age_tips.get(age_group, age_tips["12+_months"])
+        
+        # Возвращаем только совет без информации о возрасте
+        selected_tip = random.choice(tips)
+        return selected_tip
+        
+    except Exception as e:
+        print(f"Ошибка при получении возрастного совета: {e}")
+        return get_random_tip()
 
 # Новые функции для купания
 def add_bath(user_id, minutes_ago=0):
@@ -675,6 +836,9 @@ def add_bath(user_id, minutes_ago=0):
                 (family_id, user_id, timestamp.isoformat(), role, name))
     conn.commit()
     conn.close()
+    
+    # Синхронизируем с Render
+    sync_to_render()
 
 def get_last_bath_time_for_family(family_id):
     """Получить время последнего купания для семьи"""
@@ -733,6 +897,9 @@ def add_activity(user_id, activity_type="tummy_time", minutes_ago=0):
                 (family_id, user_id, timestamp.isoformat(), activity_type, role, name))
     conn.commit()
     conn.close()
+    
+    # Синхронизируем с Render
+    sync_to_render()
 
 def get_last_activity_time_for_family(family_id, activity_type="tummy_time"):
     """Получить время последней активности для семьи"""
@@ -941,7 +1108,7 @@ async def show_bath_settings(event):
     fid = get_family_id(uid)
     
     if not fid:
-        await event.respond("❌ Сначала создайте семью.")
+        await event.respond("😊 Привет! Сначала давайте создадим семью в настройках, чтобы я мог помочь вам следить за малышом! 💕")
         return
     
     enabled, hour, minute, period = get_bath_settings(fid)
@@ -969,7 +1136,7 @@ async def show_activity_settings(event):
     fid = get_family_id(uid)
     
     if not fid:
-        await event.respond("❌ Сначала создайте семью.")
+        await event.respond("😊 Привет! Сначала давайте создадим семью в настройках, чтобы я мог помочь вам следить за малышом! 💕")
         return
     
     enabled, interval, age_months = get_activity_settings(fid)
@@ -1010,7 +1177,7 @@ async def show_sleep_status(event):
     fid = get_family_id(uid)
     
     if not fid:
-        await event.respond("❌ Сначала создайте семью.")
+        await event.respond("😊 Привет! Сначала давайте создадим семью в настройках, чтобы я мог помочь вам следить за малышом! 💕")
         return
     
     active_sleep = get_active_sleep_session(fid)
@@ -1061,7 +1228,7 @@ async def show_sleep_history(event):
     fid = get_family_id(uid)
     
     if not fid:
-        await event.respond("❌ Сначала создайте семью.")
+        await event.respond("😊 Привет! Сначала давайте создадим семью в настройках, чтобы я мог помочь вам следить за малышом! 💕")
         return
     
     conn = sqlite3.connect("babybot.db")
@@ -1166,7 +1333,8 @@ async def start(event):
             f"👶 **Добро пожаловать в BabyCareBot!**\n\n"
             f"🏠 **Ваша семья:** {family_name}\n"
             f"👤 **Ваша роль:** {role} {name}\n\n"
-            f"💡 Я помогу следить за малышом и координировать уход в семье!"
+            f"💡 Я помогу следить за малышом и координировать уход в семье!\n\n"
+            f"📊 **Дашборд:** https://bcb-db.vercel.app"
         )
     else:
         # Пользователь не в семье
@@ -1185,15 +1353,15 @@ async def start(event):
             f"1️⃣ Создайте семью или присоединитесь к существующей\n"
             f"2️⃣ Настройте роли членов семьи\n"
             f"3️⃣ Начните записывать события\n\n"
-            f"💡 Нажмите '⚙ Настройки' для создания семьи!"
+            f"💡 Нажмите '⚙ Настройки' для создания семьи!\n\n"
+            f"📊 **Дашборд:** https://bcb-db.vercel.app"
         )
     
     # Всегда показываем полное меню
     buttons = [
         [Button.text("🍼 Кормление"), Button.text("🧷 Смена подгузника")],
         [Button.text("😴 Сон"), Button.text("📜 История")],
-        [Button.text("💡 Совет"), Button.text("⚙ Настройки")],
-        [Button.url("📊 Дашборд", "https://bcb-db.vercel.app")]
+        [Button.text("💡 Совет"), Button.text("⚙ Настройки")]
     ]
     
     await event.respond(welcome_message, buttons=buttons)
@@ -1205,7 +1373,7 @@ async def feeding_menu(event):
     fid = get_family_id(uid)
     
     if not fid:
-        await event.respond("❌ Сначала создайте семью.")
+        await event.respond("😊 Привет! Сначала давайте создадим семью в настройках, чтобы я мог помочь вам следить за малышом! 💕")
         return
     
     # Получаем интервал кормления
@@ -1271,11 +1439,74 @@ async def feeding_menu(event):
 
 @client.on(events.NewMessage(pattern='🧷 Смена подгузника'))
 async def diaper_menu(event):
+    """Показать статус смены подгузника с возможностью отметить смену"""
+    uid = event.sender_id
+    fid = get_family_id(uid)
+    
+    if not fid:
+        await event.respond("😊 Привет! Сначала давайте создадим семью в настройках, чтобы я мог помочь вам следить за малышом! 💕")
+        return
+    
+    # Получаем интервал смены подгузника
+    conn = sqlite3.connect("babybot.db")
+    cur = conn.cursor()
+    cur.execute("SELECT diaper_interval FROM settings WHERE family_id = ?", (fid,))
+    interval_result = cur.fetchone()
+    diaper_interval = interval_result[0] if interval_result else 3
+    
+    # Получаем время последней смены подгузника
+    last_diaper = get_last_diaper_change_time_for_family(fid)
+    
+    if last_diaper:
+        time_since_last = get_thai_time() - last_diaper
+        hours_since_last = time_since_last.total_seconds() / 3600
+        minutes_since_last = time_since_last.total_seconds() / 60
+        
+        # Определяем статус
+        if hours_since_last < diaper_interval:
+            status = "✅ Время смены подгузника еще не подошло"
+            remaining = diaper_interval - hours_since_last
+            status_emoji = "🟢"
+        elif hours_since_last < (diaper_interval + 0.5):
+            status = "⚠️ Пора сменить подгузник!"
+            remaining = 0
+            status_emoji = "🟡"
+        else:
+            status = "🚨 Долго не меняли подгузник!"
+            remaining = 0
+            status_emoji = "🔴"
+        
+        message = (
+            f"{status_emoji} **Статус смены подгузника**\n\n"
+            f"⏰ Последняя смена: {last_diaper.strftime('%H:%M')}\n"
+            f"🕐 Прошло: {hours_since_last:.1f} ч. ({minutes_since_last:.0f} мин.)\n"
+            f"🔄 Интервал: {diaper_interval} ч.\n"
+            f"📊 Статус: {status}\n"
+        )
+        
+        if remaining > 0:
+            message += f"⏳ До следующей смены: {remaining:.1f} ч."
+        else:
+            message += f"💡 Рекомендуется сменить подгузник сейчас!"
+    else:
+        message = (
+            f"🧷 **Статус смены подгузника**\n\n"
+            f"👶 Смен подгузника еще не было\n"
+            f"🔄 Рекомендуемый интервал: {diaper_interval} ч.\n"
+            f"💡 Запишите первую смену подгузника!"
+        )
+    
+    conn.close()
+    
+    # Добавляем кнопки для быстрых действий
     buttons = [
-        [Button.inline("Сейчас", b"diaper_now")],
-        [Button.inline("🕒 Указать вручную", b"diaper_manual")],
+        [Button.inline("🧷 Сменить сейчас", b"diaper_now")],
+        [Button.inline("15 мин назад", b"diaper_15")],
+        [Button.inline("30 мин назад", b"diaper_30")],
+        [Button.inline("🕒 Указать время", b"diaper_manual")]
     ]
-    await event.respond("🧷 Когда была смена подгузника?", buttons=buttons)
+    
+    await event.respond(message, buttons=buttons)
 
 @client.on(events.NewMessage(pattern='⏰ Когда ел?'))
 async def last_feed(event):
@@ -1289,7 +1520,16 @@ async def last_feed(event):
 
 @client.on(events.NewMessage(pattern='💡 Совет'))
 async def tip_command(event):
-    tip = get_random_tip()
+    uid = event.sender_id
+    fid = get_family_id(uid)
+    
+    if fid:
+        # Если пользователь в семье, получаем возрастной совет
+        tip = get_age_based_tip(fid)
+    else:
+        # Если не в семье, показываем общий совет
+        tip = get_random_tip()
+    
     await event.respond(tip)
 
 @client.on(events.NewMessage(pattern='ℹ️ Как это работает'))
@@ -1334,7 +1574,7 @@ async def my_role_command(event):
     fid = get_family_id(uid)
     
     if not fid:
-        await event.respond("❌ Сначала создайте семью.")
+        await event.respond("😊 Привет! Сначала давайте создадим семью в настройках, чтобы я мог помочь вам следить за малышом! 💕")
         return
     
     role, name = get_member_info(uid)
@@ -1519,7 +1759,7 @@ async def sleep_menu(event):
     fid = get_family_id(uid)
     
     if not fid:
-        await event.respond("❌ Сначала создайте семью.")
+        await event.respond("😊 Привет! Сначала давайте создадим семью в настройках, чтобы я мог помочь вам следить за малышом! 💕")
         return
     
     active_sleep = get_active_sleep_session(fid)
@@ -1564,26 +1804,26 @@ async def callback_handler(event):
 
     if data == "feed_now":
         add_feeding(event.sender_id)
-        await event.edit("🍼 Кормление зафиксировано.")
+        await event.edit("🍼 Отлично! Кормление записано! Малыш сыт и доволен! 😊")
     elif data == "feed_15":
         add_feeding(event.sender_id, 15)
-        await event.edit("🍼 Кормление (15 мин назад) зафиксировано.")
+        await event.edit("🍼 Замечательно! Кормление 15 минут назад записано! Малыш был сыт! 😊")
     elif data == "feed_30":
         add_feeding(event.sender_id, 30)
-        await event.edit("🍼 Кормление (30 мин назад) зафиксировано.")
+        await event.edit("🍼 Прекрасно! Кормление 30 минут назад записано! Малыш был доволен! 😊")
     elif data == "feed_manual":
         manual_feeding_pending[event.sender_id] = True
         await event.respond("🕒 Введите время кормления в формате ЧЧ:ММ (например, 14:30):")
 
     elif data == "diaper_now":
         add_diaper_change(event.sender_id)
-        await event.edit("🧷 Смена подгузника зафиксирована.")
+        await event.edit("🧷 Отлично! Смена подгузника записана! Малыш чистенький и довольный! 😊")
     elif data == "diaper_15":
         add_diaper_change(event.sender_id, 15)
-        await event.edit("🧷 Смена подгузника (15 мин назад) зафиксирована.")
+        await event.edit("🧷 Замечательно! Смена подгузника 15 минут назад записана! Малыш был чистенький! 😊")
     elif data == "diaper_30":
         add_diaper_change(event.sender_id, 30)
-        await event.edit("🧷 Смена подгузника (30 мин назад) зафиксирована.")
+        await event.edit("🧷 Прекрасно! Смена подгузника 30 минут назад записана! Малыш был довольный! 😊")
     elif data == "diaper_manual":
         manual_feeding_pending[event.sender_id] = "diaper"
         await event.respond("🕒 Введите время смены подгузника в формате ЧЧ:ММ (например, 14:30):")
@@ -1605,7 +1845,7 @@ async def callback_handler(event):
             time_str = manual_feeding_pending[uid]["time"]
             add_feeding(uid, minutes_ago=minutes_ago)
             yesterday = (datetime.now() - timedelta(days=1)).strftime('%d.%m')
-            await event.edit(f"✅ Кормление за вчера ({yesterday}) в {time_str} зафиксировано.")
+            await event.edit(f"✅ Отлично! Кормление за вчера ({yesterday}) в {time_str} записано! Малыш был сыт! 😊")
             del manual_feeding_pending[uid]
         else:
             await event.edit("❌ Ошибка: данные о времени не найдены.")
@@ -1621,7 +1861,7 @@ async def callback_handler(event):
             time_str = manual_feeding_pending[uid]["time"]
             add_diaper_change(uid, minutes_ago=minutes_ago)
             yesterday = (datetime.now() - timedelta(days=1)).strftime('%d.%m')
-            await event.edit(f"✅ Смена подгузника за вчера ({yesterday}) в {time_str} зафиксирована.")
+            await event.edit(f"✅ Отлично! Смена подгузника за вчера ({yesterday}) в {time_str} записана! Малыш был чистенький! 😊")
             del manual_feeding_pending[uid]
         else:
             await event.edit("❌ Ошибка: данные о времени не найдены.")
@@ -1635,7 +1875,7 @@ async def callback_handler(event):
             time_str = bath_pending[uid]["time"]
             add_bath(uid, minutes_ago=minutes_ago)
             yesterday = (get_thai_date() - timedelta(days=1)).strftime('%d.%m')
-            await event.edit(f"✅ Купание за вчера ({yesterday}) в {time_str} зафиксировано.")
+            await event.edit(f"✅ Отлично! Купание за вчера ({yesterday}) в {time_str} записано! Малыш был чистенький! 😊")
             del bath_pending[uid]
         else:
             await event.edit("❌ Ошибка: данные о времени не найдены.")
@@ -1742,6 +1982,7 @@ async def callback_handler(event):
         # Возвращаемся к настройкам через 2 секунды
         await asyncio.sleep(2)
         await settings_menu(event)
+    
     
     elif data.startswith("hist_"):
         print(f"DEBUG: Обработка истории для пользователя {event.sender_id}, data: {data}")
@@ -1872,13 +2113,13 @@ async def callback_handler(event):
     # Обработчики для купания
     elif data == "bath_now":
         add_bath(event.sender_id)
-        await event.edit("🛁 Купание зафиксировано.")
+        await event.edit("🛁 Отлично! Купание записано! Малыш чистенький и довольный! 😊")
     elif data == "bath_15":
         add_bath(event.sender_id, 15)
-        await event.edit("🛁 Купание (15 мин назад) зафиксировано.")
+        await event.edit("🛁 Замечательно! Купание 15 минут назад записано! Малыш был чистенький! 😊")
     elif data == "bath_30":
         add_bath(event.sender_id, 30)
-        await event.edit("🛁 Купание (30 мин назад) зафиксировано.")
+        await event.edit("🛁 Прекрасно! Купание 30 минут назад записано! Малыш был довольный! 😊")
     elif data == "bath_manual":
         bath_pending[event.sender_id] = True
         await event.respond("🕒 Введите время купания в формате ЧЧ:ММ (например, 14:30):")
@@ -1888,13 +2129,13 @@ async def callback_handler(event):
     # Обработчики для игр
     elif data == "activity_tummy":
         add_activity(event.sender_id, "tummy_time")
-        await event.edit("🦵 Выкладывание на живот зафиксировано.")
+        await event.edit("🦵 Отлично! Выкладывание на живот записано! Малыш тренирует мышцы! 😊")
     elif data == "activity_play":
         add_activity(event.sender_id, "play")
-        await event.edit("🎯 Игра зафиксирована.")
+        await event.edit("🎯 Отлично! Игра записана! Малыш весело провел время! 😊")
     elif data == "activity_massage":
         add_activity(event.sender_id, "massage")
-        await event.edit("💆 Массаж зафиксирован.")
+        await event.edit("💆 Отлично! Массаж записан! Малыш расслабился и доволен! 😊")
     elif data == "activity_settings":
         await show_activity_settings(event)
     
@@ -2207,6 +2448,7 @@ async def handle_text(event):
             del baby_birth_pending[uid]
         return
     
+    
     # Обработка ввода для купания
     if uid in bath_pending:
         user_input = event.raw_text.strip()
@@ -2459,7 +2701,8 @@ async def send_scheduled_tips():
         for (family_id, tips_hour, tips_minute) in families:
             # Проверяем, пора ли отправлять советы для этой семьи
             if current_hour == tips_hour and current_minute == tips_minute:
-                tip = get_random_tip()
+                # Получаем возрастной совет для семьи
+                tip = get_age_based_tip(family_id)
                 
                 # Получаем всех членов семьи
                 cur.execute("SELECT user_id FROM family_members WHERE family_id = ?", (family_id,))
@@ -2469,7 +2712,7 @@ async def send_scheduled_tips():
                 for (user_id,) in members:
                     try:
                         await client.send_message(user_id, tip)
-                        print(f"✅ Отправлен совет пользователю {user_id} в {current_hour:02d}:{current_minute:02d}")
+                        print(f"✅ Отправлен возрастной совет пользователю {user_id} в {current_hour:02d}:{current_minute:02d}")
                     except Exception as e:
                         print(f"❌ Ошибка отправки совета пользователю {user_id}: {e}")
         

@@ -21,7 +21,7 @@ wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# Virtual Environment
 venv/
 env/
 ENV/
@@ -35,7 +35,7 @@ venv.bak/
 .env.test.local
 .env.production.local
 
-# Database
+# Database files
 *.db
 *.sqlite
 *.sqlite3
@@ -44,6 +44,15 @@ venv.bak/
 *.log
 logs/
 
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
 # IDE
 .vscode/
 .idea/
@@ -51,13 +60,14 @@ logs/
 *.swo
 *~
 
-# OS
-.DS_Store
-Thumbs.db
-desktop.ini
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Telegram session files
-*.session
+# Vercel
+.vercel
 
 # Temporary files
 *.tmp
